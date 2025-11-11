@@ -2,7 +2,7 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name="sys_user", schema_name="material")]
+#[sea_orm(table_name="sys_user")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment= true)]
     pub auto_id: i64,
@@ -20,8 +20,8 @@ pub struct Model {
     pub login_ip: Option<String>,
     pub image_url: Option<String>,
     pub reg_time: Option<DateTime>,
-    pub locked: i16,
-    pub is_valid: i16,
+    pub locked: i32,
+    pub is_valid: i32,
     pub email_password: Option<String>,
 
 }
@@ -37,8 +37,8 @@ impl Model {
         self.locked == 1
     }
 
-    /// 检查用户是否有效,1为无效
+    /// 检查用户是否有效,0为有效
     pub fn is_valid(&self) -> bool {
-        self.is_valid != 1
+        self.is_valid == 0
     }
 }

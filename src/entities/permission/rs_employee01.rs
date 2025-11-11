@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use chrono::NaiveDate;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "rs_employee01", schema_name = "material")]
+#[sea_orm(table_name = "rs_employee01")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = true)]
     pub empid: i64,
@@ -38,7 +38,7 @@ pub struct Model {
     pub mealclass: Option<String>,
 
     #[sea_orm(default_value = "0")]
-    pub gender: i16,
+    pub gender: i32,
 
     pub idcardaddr: Option<String>,
 
@@ -54,10 +54,10 @@ pub struct Model {
 
     pub remark: Option<String>,
 
-    pub statusid: Option<i16>,
+    pub statusid: Option<i32>,
 
     #[sea_orm(default_value = "1")]
-    pub passtype: i16,
+    pub passtype: i32,
 
     pub accgrpid: Option<i64>,
 
@@ -69,7 +69,7 @@ pub struct Model {
 
     pub luser: Option<String>,
 
-    pub ltime: Option<chrono::NaiveDateTime>,
+    pub ltime: Option<NaiveDate>,
 
     pub psid: Option<String>,
 

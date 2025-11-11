@@ -3,24 +3,21 @@ use sea_orm::{ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, Qu
 use crate::{
     common::api_response::AppResult,
     entities::{permission::sys_user, prelude::SysUser},
-    models::permission::user_dto::CreateReq,
+    models::permission::user_dto::CreateReq, utils::error_util,
 };
 
 pub async fn query_user_by_user_id(
     user_id: &str,
     db: &DatabaseConnection,
-) -> Option<sys_user::Model> {
-    match SysUser::find()
+) -> AppResult<Option<sys_user::Model>> {
+    SysUser::find()
         .filter(sys_user::Column::UserId.eq(user_id.to_string()))
         .one(db)
-        .await {
-        Ok(Some(user)) => Some(user),
-        Ok(None) => None,
-        Err(msg) => {
-            tracing::error!("{}", msg);
-            None
-        },
-    }
+        .await
+        .map_err(|e| {
+            tracing::error!("query_user_by_user_id error: {}", e);
+            error_util::system_error()
+        })
 }
 
 pub async fn create_user(data: CreateReq, db: &DatabaseConnection) -> AppResult<()> {
@@ -35,7 +32,12 @@ pub async fn create_user(data: CreateReq, db: &DatabaseConnection) -> AppResult<
         ..Default::default()
     };
 
-    SysUser::insert(insert_data).exec(db).await?;
-
-    Ok(())
+    SysUser::insert(insert_data)
+        .exec(db)
+        .await
+        .map(|_| ())
+        .map_err(|e| {
+            tracing::error!("create_user error: {}", e);
+            error_util::system_error()
+        })
 }

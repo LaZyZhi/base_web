@@ -36,6 +36,7 @@ pub fn init() {
         .set(config)
         .expect("config should be set");
 }
+
 pub fn get() -> &'static ServerConfig {
     CONFIG.get().expect("config should be set")
 }
@@ -48,6 +49,9 @@ pub struct ServerConfig {
     pub db: DbConfig,
     pub log: LogConfig,
     pub jwt: JwtConfig,
+    pub redis: RedisConfig,
+    pub minio: MinioConfig,
+    pub kafka: KafkaConfig,
     pub tls: Option<TlsConfig>,
 }
 
@@ -56,6 +60,39 @@ pub struct JwtConfig {
     pub secret: String,
     pub expiry: i64,
 }
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct RedisConfig {
+    pub host: String,
+    pub password: Option<String>,
+    pub port: u16,
+    pub timeout: u64,
+    pub database: u8,
+    pub max_active: u32,
+    pub max_wait: i64,
+    pub max_idle: u32,
+    pub min_idle: u32,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct MinioConfig {
+    pub access_key: String,
+    pub secret_key: String,
+    pub url: String,
+    pub bucket_name: String,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct KafkaConfig {
+    pub bootstrap_servers: String,
+    pub group_id: String,
+    pub enable_auto_commit: bool,
+    pub auto_offset_reset: String,
+    pub ack_mode: String,
+    pub transaction_id_prefix: String,
+    pub security_protocol: String,
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct TlsConfig {
     pub cert: String,
@@ -66,6 +103,7 @@ pub struct TlsConfig {
 pub fn default_false() -> bool {
     false
 }
+
 #[allow(dead_code)]
 pub fn default_true() -> bool {
     true

@@ -1,7 +1,6 @@
-use std::ptr::null;
 use salvo::http::StatusError;
 use sea_orm::DatabaseConnection;
-use sea_orm::sqlx::encode::IsNull::No;
+use crate::utils::error_util;
 use crate::{
     common::api_response::AppResult, entities::permission::sys_user,
     models::permission::user_dto::CreateReq, repository::permission::user_repository, utils,
@@ -20,12 +19,15 @@ impl UserService {
             crate::repository::permission::user_repository::query_user_by_user_id(user_id, db)
                 .await;
         match user {
-            Some(user) => Ok(user),
-            None => {
+            Ok(Some(user)) => Ok(user),
+            Ok(None) => {
                 tracing::error!("用户{}不存在", user_id);
                 Err(StatusError::unauthorized()
                     .brief("用户账号或者密码不正确")
                     .into())
+            }
+            Err(_) => {
+                Err(error_util::system_error())
             }
         }
     }
@@ -50,8 +52,7 @@ impl UserService {
     /// 校验用户账号密码
     pub async fn verify_user_credentials(password: &str, input_password: &str) -> AppResult<()> {
         // 密码校验业务逻辑
-        let input_password = utils::hash_password(input_password)?;
-        if utils::verify_password(password, &input_password)
+        if utils::verify_password(input_password, password)
             .err()
             .is_some()
         {
@@ -63,32 +64,37 @@ impl UserService {
     }
 
     pub async fn create_user(data: CreateReq, db: &DatabaseConnection) -> AppResult<()> {
-        if user_repository::query_user_by_user_id(&data.user_id, db).await.is_some() {
+        // 检查用户是否已存在
+        if let Some(_) = user_repository::query_user_by_user_id(&data.user_id, db).await? {
             return Err(StatusError::internal_server_error().brief("用户已存在").into());
         }
 
         // 查询输入的工号是否存在
-        let emp_info = employee_repository::query_employee_by_emp_no(&data.user_id, db).await;
-        let mut data = data;
-        match emp_info {
-            None => {
-                return Err(StatusError::internal_server_error().brief("请使用正确的工号进行注册").into());
-            }
-            Some(model) => {
-                if !model.is_active() {
-                    return Err(StatusError::internal_server_error().brief("该工号已无效").into());
-                }
+        let employee = employee_repository::query_employee_by_emp_no(&data.user_id, db).await?
+            .ok_or_else(|| StatusError::internal_server_error().brief("请使用正确的工号进行注册"))?;
 
-                data.user_name = model.empname.unwrap();
-                if data.phone == None {
-                    data.phone = model.mobileno;
-                }
-            }
+        // 检查工号是否有效
+        if !employee.is_active() {
+            return Err(StatusError::internal_server_error().brief("该工号已无效").into());
         }
 
+        // 设置用户名和手机号
+        let mut data = data;
+        data.user_name = employee.empname.unwrap_or_default();
+        if data.phone.is_none() {
+            data.phone = employee.mobileno;
+        }
+
+        // 密码哈希处理
         data.password = utils::hash_password(&data.password)?;
 
-        user_repository::create_user(data, db).await?;
+        // 创建用户
+        user_repository::create_user(data, db).await
+            .map_err(|e| {
+                tracing::error!("create_user error: {}", e);
+                StatusError::internal_server_error().brief("创建用户失败")
+            })?;
+
         Ok(())
     }
 }

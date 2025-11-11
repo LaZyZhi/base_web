@@ -1,12 +1,22 @@
 listen_addr = "127.0.0.1:8008"
 
 [db]
-url = "postgres://postgres:Postgres123!@10.22.2.71:5432/streamax?schema=material"
+url = "postgres://postgres:Postgres123!@10.22.2.71:5432/streamax?timezone=Asia/Shanghai"
 sqlx_logging = true
 
 [jwt]
 secret = "yoursecret"
 expiry = 3600
+
+[redis]
+host = "10.22.2.9"
+port = 6379
+timeout = 10000
+database = 0
+max_active = 10
+max_wait = -1
+max_idle = 8
+min_idle = 0
 
 [log]
 filter_level = "debug"

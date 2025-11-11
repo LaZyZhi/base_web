@@ -24,8 +24,8 @@ pub async fn list_page() -> JsonResult<()> {
 }
 
 #[endpoint(tags("用户与权限相关"), summary = "用户登录", description = "用户登录")]
-pub async fn login(idata: JsonBody<LoginReq>, res: &mut Response) -> JsonResult<LogInRes> {
-    let data = idata.into_inner();
+pub async fn login(data: JsonBody<LoginReq>, res: &mut Response) -> JsonResult<LogInRes> {
+    let data = data.into_inner();
     // 执行数据验证，如果验证失败则返回错误
     param_validation_util::validate_param(&data).await?;
 
@@ -40,17 +40,22 @@ pub async fn login(idata: JsonBody<LoginReq>, res: &mut Response) -> JsonResult<
     // 校验用户密码
     user_service::UserService::verify_user_credentials(&user.password, &data.password).await?;
 
-    let (token, _) = jwt::get_token(&data.user_id)?;
-    let add_result = res.add_header("Authorization", &token, true);
+    let (token, exp) = jwt::get_token(&data.user_id)?;
+    let token = format!("Bearer {}", token);
+
+    // 保存进redis
+
+    
+    let _ = res.add_header("Authorization", &token, true);
 
     json_ok(LogInRes {
-        authorization: vec![format!("Bearer {}", token)],
+        authorization: vec![token],
     })
 }
 
 #[endpoint(tags("用户与权限相关"), summary = "用户注册", description = "用户注册")]
-pub async fn create(idata: JsonBody<CreateReq>) -> JsonResult<&'static str> {
-    let data = idata.into_inner();
+pub async fn create(data: JsonBody<CreateReq>) -> JsonResult<&'static str> {
+    let data = data.into_inner();
     param_validation_util::validate_param(&data).await?;
     let db = db::postgres::pool();
 
