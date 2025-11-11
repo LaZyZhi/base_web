@@ -88,20 +88,18 @@ mod tests {
     use crate::config;
 
     #[tokio::test]
-    async fn test_hello_world() {
+    async fn test_openapi_docs() {
         config::init();
 
         let service = Service::new(crate::routers::root());
 
-        let content = TestClient::get(format!(
-            "http://{}",
-            config::get().listen_addr.replace("0.0.0.0", "127.0.0.1")
-        ))
-        .send(&service)
-        .await
-        .take_string()
-        .await
-        .unwrap();
-        assert_eq!(content, "Hello World from salvo");
+        // 测试是否能访问OpenAPI文档页面
+        let content = TestClient::get("http://127.0.0.1:8008/scalar")
+            .send(&service)
+            .await
+            .take_string()
+            .await
+            .unwrap();
+        assert!(content.contains("scalar"));
     }
 }

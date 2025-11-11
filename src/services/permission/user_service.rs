@@ -1,7 +1,12 @@
+use std::ptr::null;
 use salvo::http::StatusError;
 use sea_orm::DatabaseConnection;
-
-use crate::{common::api_response::AppResult, entities::permission::sys_user, utils};
+use sea_orm::sqlx::encode::IsNull::No;
+use crate::{
+    common::api_response::AppResult, entities::permission::sys_user,
+    models::permission::user_dto::CreateReq, repository::permission::user_repository, utils,
+};
+use crate::repository::permission::employee_repository;
 
 pub struct UserService;
 
@@ -54,6 +59,36 @@ impl UserService {
                 .brief("用户账号或者密码不正确")
                 .into());
         }
+        Ok(())
+    }
+
+    pub async fn create_user(data: CreateReq, db: &DatabaseConnection) -> AppResult<()> {
+        if user_repository::query_user_by_user_id(&data.user_id, db).await.is_some() {
+            return Err(StatusError::internal_server_error().brief("用户已存在").into());
+        }
+
+        // 查询输入的工号是否存在
+        let emp_info = employee_repository::query_employee_by_emp_no(&data.user_id, db).await;
+        let mut data = data;
+        match emp_info {
+            None => {
+                return Err(StatusError::internal_server_error().brief("请使用正确的工号进行注册").into());
+            }
+            Some(model) => {
+                if !model.is_active() {
+                    return Err(StatusError::internal_server_error().brief("该工号已无效").into());
+                }
+
+                data.user_name = model.empname.unwrap();
+                if data.phone == None {
+                    data.phone = model.mobileno;
+                }
+            }
+        }
+
+        data.password = utils::hash_password(&data.password)?;
+
+        user_repository::create_user(data, db).await?;
         Ok(())
     }
 }

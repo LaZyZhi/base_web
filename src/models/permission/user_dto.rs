@@ -17,7 +17,6 @@ pub struct UserPageReq {
 
 #[derive(Debug, ToSchema, Clone, Deserialize, Validate)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
 pub struct LoginReq {
     /// 用户id(工号)
     #[validate(length(min = 1, message = "用户id不能为空"))]
@@ -33,4 +32,44 @@ pub struct LoginReq {
 pub struct LogInRes {
     #[serde(rename = "Authorization")]
     pub authorization: Vec<String>
+}
+
+
+#[derive(Debug, ToSchema, Clone, Deserialize, Validate)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub struct CreateReq {
+    /// 用户id(工号)
+    #[validate(length(min = 1, message = "用户id不能为空"))]
+    pub user_id : String,
+
+    /// 用户名称
+    #[validate(length(min = 1, message = "用户名称不能为空"))]
+    pub user_name : String,
+
+    /// 密码
+    #[validate(length(min = 1, message = "密码不能为空"))]
+    pub password: String,
+
+    /// 手机号
+    pub phone: Option<String>,
+
+    /// 邮箱
+    #[validate(email(message = "邮箱格式不正确"))]
+    pub email: Option<String>,
+
+    /// 用户邮箱密码
+    pub email_password: Option<String>,
+
+    ///备注
+    pub remark: Option<String>,
+
+    /// 头像图片地址
+    pub image_url: Option<String>,
+
+    /// 是否锁定
+    pub locked: Option<i16>,
+
+    /// 是否有效
+    pub is_valid: Option<i16>,
 }

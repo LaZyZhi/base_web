@@ -1,4 +1,5 @@
 pub mod param_validation_util;
+pub mod timer_util;
 use argon2::{
     Argon2, PasswordHash,
     password_hash::{SaltString, rand_core::OsRng},

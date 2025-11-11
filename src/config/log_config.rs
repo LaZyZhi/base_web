@@ -5,6 +5,8 @@ use tracing_subscriber::fmt;
 
 use tracing_appender::rolling;
 
+use crate::utils::timer_util::LocalTimeWithMillis;
+
 use super::default_true;
 
 const FORMAT_PRETTY: &str = "pretty";
@@ -183,18 +185,23 @@ impl LogConfig {
         };
         let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
 
+        // 创建时间格式化器实例
+        let time_format = LocalTimeWithMillis;
+
         // Tracing subscriber init.
         let subscriber = tracing_subscriber::fmt()
             .with_env_filter(
                 tracing_subscriber::EnvFilter::try_from_default_env()
                     .unwrap_or(tracing_subscriber::EnvFilter::new(&self.filter_level)),
             )
-            .with_ansi(self.with_ansi);
+            .with_ansi(self.with_ansi)
+            .with_timer(time_format);
 
         if self.format == FORMAT_PRETTY {
             let subscriber = subscriber.event_format(
                 fmt::format()
                     .pretty()
+                    .with_timer(LocalTimeWithMillis)
                     .with_level(self.with_level)
                     .with_target(self.with_target)
                     .with_thread_ids(self.with_thread_ids)
@@ -210,6 +217,7 @@ impl LogConfig {
             let subscriber = subscriber.event_format(
                 fmt::format()
                     .compact()
+                    .with_timer(LocalTimeWithMillis)
                     .with_level(self.with_level)
                     .with_target(self.with_target)
                     .with_thread_ids(self.with_thread_ids)
@@ -225,6 +233,7 @@ impl LogConfig {
             let subscriber = subscriber.event_format(
                 fmt::format()
                     .json()
+                    .with_timer(LocalTimeWithMillis)
                     .with_level(self.with_level)
                     .with_target(self.with_target)
                     .with_thread_ids(self.with_thread_ids)
@@ -239,6 +248,7 @@ impl LogConfig {
         } else if self.format == FORMAT_FULL {
             let subscriber = subscriber.event_format(
                 fmt::format()
+                    .with_timer(LocalTimeWithMillis)
                     .with_level(self.with_level)
                     .with_target(self.with_target)
                     .with_thread_ids(self.with_thread_ids)

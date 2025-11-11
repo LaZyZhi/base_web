@@ -14,7 +14,8 @@ pub async fn init(config: &DbConfig) {
         .min_connections(config.min_connections)
         .connect_timeout(Duration::from_secs(config.connect_timeout as u64))
         .idle_timeout(Duration::from_secs(config.idle_timeout as u64))
-        .sqlx_logging(config.sqlx_logging);
+        .sqlx_logging(config.sqlx_logging)
+        .sqlx_logging_level(log::LevelFilter::Debug); // 设置SQL日志级别
 
     let pool = Database::connect(opt)
         .await

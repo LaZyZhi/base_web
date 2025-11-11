@@ -3,11 +3,14 @@ use salvo::{
     oapi::{endpoint, extract::JsonBody},
 };
 
+use crate::common::api_response::json_ok;
 use crate::{
-    common::api_response::{JsonResult, api_success}, db,
+    common::api_response::{JsonResult, api_success},
+    db,
     hoops::jwt,
-    models::permission::user_dto::{LogInRes, LoginReq},
-    services::permission::user_service, utils::param_validation_util,
+    models::permission::user_dto::{CreateReq, LogInRes, LoginReq},
+    services::permission::user_service,
+    utils::param_validation_util,
 };
 use salvo::Writer;
 
@@ -38,10 +41,19 @@ pub async fn login(idata: JsonBody<LoginReq>, res: &mut Response) -> JsonResult<
     user_service::UserService::verify_user_credentials(&user.password, &data.password).await?;
 
     let (token, _) = jwt::get_token(&data.user_id)?;
+    let add_result = res.add_header("Authorization", &token, true);
 
-    let _ = res.add_header("Authorization", &token, true);
-
-    api_success(LogInRes {
+    json_ok(LogInRes {
         authorization: vec![format!("Bearer {}", token)],
-    }, "登录成功")
+    })
+}
+
+#[endpoint(tags("用户与权限相关"), summary = "用户注册", description = "用户注册")]
+pub async fn create(idata: JsonBody<CreateReq>) -> JsonResult<&'static str> {
+    let data = idata.into_inner();
+    param_validation_util::validate_param(&data).await?;
+    let db = db::postgres::pool();
+
+    user_service::UserService::create_user(data, db).await?;
+    json_ok("注册成功")
 }

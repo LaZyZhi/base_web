@@ -2,11 +2,13 @@ listen_addr = "127.0.0.1:8008"
 
 [db]
 url = "postgres://postgres:Postgres123!@10.22.2.71:5432/streamax?schema=material"
+sqlx_logging = true
 
 [jwt]
 secret = "yoursecret"
 expiry = 3600
 
 [log]
+filter_level = "debug"
 file_name = "app.log"
 rolling = "daily"

@@ -22,6 +22,7 @@ pub fn json_ok<T>(data: T) -> JsonResult<T> {
     }))
 }
 
+#[allow(dead_code)]
 pub fn api_success<T>(data: T, msg: &str) -> JsonResult<T> {
     Ok(Json(ApiResponse {
         code: StatusCode::OK.as_u16(),
