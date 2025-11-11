@@ -13,6 +13,7 @@ use crate::{
     utils::param_validation_util,
 };
 use salvo::Writer;
+use crate::services::redis_service::RedisService;
 
 #[endpoint(
     tags("用户与权限相关"),
@@ -42,9 +43,8 @@ pub async fn login(data: JsonBody<LoginReq>, res: &mut Response) -> JsonResult<L
 
     let (token, exp) = jwt::get_token(&data.user_id)?;
     let token = format!("Bearer {}", token);
-
     // 保存进redis
-
+    let _ = RedisService::set(&token, &data.user_id, Some(exp as usize));
     
     let _ = res.add_header("Authorization", &token, true);
 

@@ -5,6 +5,7 @@ use salvo::server::ServerHandle;
 use tokio::signal;
 use tracing::info;
 
+mod cache;
 mod config;
 mod db;
 mod hoops;
@@ -23,6 +24,11 @@ async fn main() {
     crate::config::init();
     let config = crate::config::get();
     crate::db::postgres::init(&config.db).await;
+    
+    // 初始化Redis连接池
+    if let Err(e) = crate::cache::redis_manager::init_redis_pool() {
+        tracing::error!("Failed to initialize Redis pool: {}", e);
+    }
 
     let _guard = config.log.guard();
     tracing::info!("log level: {}", &config.log.filter_level);

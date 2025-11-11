@@ -50,8 +50,6 @@ pub struct ServerConfig {
     pub log: LogConfig,
     pub jwt: JwtConfig,
     pub redis: RedisConfig,
-    pub minio: MinioConfig,
-    pub kafka: KafkaConfig,
     pub tls: Option<TlsConfig>,
 }
 
@@ -72,25 +70,6 @@ pub struct RedisConfig {
     pub max_wait: i64,
     pub max_idle: u32,
     pub min_idle: u32,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-pub struct MinioConfig {
-    pub access_key: String,
-    pub secret_key: String,
-    pub url: String,
-    pub bucket_name: String,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-pub struct KafkaConfig {
-    pub bootstrap_servers: String,
-    pub group_id: String,
-    pub enable_auto_commit: bool,
-    pub auto_offset_reset: String,
-    pub ack_mode: String,
-    pub transaction_id_prefix: String,
-    pub security_protocol: String,
 }
 
 #[derive(Deserialize, Clone, Debug)]

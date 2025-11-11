@@ -1,7 +1,8 @@
 listen_addr = "127.0.0.1:8008"
 
 [db]
-url = "postgres://postgres:Postgres123!@10.22.2.71:5432/streamax?timezone=Asia/Shanghai"
+# url = "postgres://postgres:Postgres123!@10.22.2.71:5432/streamax?timezone=Asia/Shanghai"
+url = "postgres://postgres:Postgres123!@159.75.246.31:5432/streamax?timezone=Asia/Shanghai"
 sqlx_logging = true
 
 [jwt]
@@ -9,7 +10,9 @@ secret = "yoursecret"
 expiry = 3600
 
 [redis]
-host = "10.22.2.9"
+# host = "10.22.2.9"
+host = "159.75.246.31"
+password = "Redis123!"
 port = 6379
 timeout = 10000
 database = 0

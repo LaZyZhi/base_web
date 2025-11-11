@@ -2,6 +2,8 @@ use salvo::oapi::ToSchema;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::{entities::permission::sys_user, utils};
+
 #[derive(Debug, ToSchema, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
@@ -32,6 +34,29 @@ pub struct LoginReq {
 pub struct LogInRes {
     #[serde(rename = "Authorization")]
     pub authorization: Vec<String>
+}
+
+#[derive(Debug, ToSchema, Clone, Deserialize, Validate)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub struct RegisterReq {
+    /// 用户id(工号)
+    #[validate(length(min = 1, message = "用户id不能为空"))]
+    pub user_id : String,
+
+    /// 密码
+    #[validate(length(min = 1, message = "密码不能为空"))]
+    pub password: String
+}
+
+impl RegisterReq {
+    pub fn into_model(self) -> sys_user::Model {
+        sys_user::Model {
+            user_id: self.user_id,
+            password: utils::hash_password(&self.password).unwrap(),
+            ..Default::default()
+        }
+    }
 }
 
 
