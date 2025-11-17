@@ -1,7 +1,9 @@
+use std::path::Path;
 use std::sync::OnceLock;
 
-use figment::Figment;
+use anyhow::{anyhow, Result};
 use figment::providers::{Env, Format, Toml};
+use figment::Figment;
 use serde::Deserialize;
 
 mod log_config;
@@ -12,29 +14,31 @@ pub use db_config::DbConfig;
 pub static CONFIG: OnceLock<ServerConfig> = OnceLock::new();
 
 pub fn init() {
-    let raw_config = Figment::new()
-        .merge(Toml::file(
-            Env::var("APP_CONFIG").as_deref().unwrap_or("config.toml"),
-        ))
-        .merge(Env::prefixed("APP_").global());
+    CONFIG.get_or_init(|| {
+        let raw_config = Figment::new()
+            .merge(Toml::file(
+                Env::var("APP_CONFIG").as_deref().unwrap_or("config.toml"),
+            ))
+            .merge(Env::prefixed("APP_").global());
 
-    let mut config = match raw_config.extract::<ServerConfig>() {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("It looks like your config is invalid. The following error occurred: {e}");
+        let mut config = match raw_config.extract::<ServerConfig>() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!(
+                    "It looks like your config is invalid. The following error occurred: {e}"
+                );
+                std::process::exit(1);
+            }
+        };
+        if config.db.url.is_empty() {
+            config.db.url = std::env::var("DATABASE_URL").unwrap_or_default();
+        }
+        if config.db.url.is_empty() {
+            eprintln!("DATABASE_URL is not set");
             std::process::exit(1);
         }
-    };
-    if config.db.url.is_empty() {
-        config.db.url = std::env::var("DATABASE_URL").unwrap_or_default();
-    }
-    if config.db.url.is_empty() {
-        eprintln!("DATABASE_URL is not set");
-        std::process::exit(1);
-    }
-    crate::config::CONFIG
-        .set(config)
-        .expect("config should be set");
+        config
+    });
 }
 
 pub fn get() -> &'static ServerConfig {
@@ -90,4 +94,64 @@ pub fn default_true() -> bool {
 
 fn default_listen_addr() -> String {
     "127.0.0.1:8008".into()
+}
+
+impl ServerConfig {
+    pub fn validate(&self) -> Result<()> {
+        if self.listen_addr.trim().is_empty() {
+            return Err(anyhow!("listen_addr 不能为空"));
+        }
+        self.db.validate()?;
+        self.jwt.validate()?;
+        self.redis.validate()?;
+        if let Some(tls) = &self.tls {
+            tls.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl DbConfig {
+    pub fn validate(&self) -> Result<()> {
+        if self.url.trim().is_empty() {
+            return Err(anyhow!("数据库配置 url 不能为空"));
+        }
+        Ok(())
+    }
+}
+
+impl JwtConfig {
+    pub fn validate(&self) -> Result<()> {
+        if self.secret.trim().is_empty() {
+            return Err(anyhow!("jwt.secret 不能为空"));
+        }
+        Ok(())
+    }
+}
+
+impl RedisConfig {
+    pub fn validate(&self) -> Result<()> {
+        if self.host.trim().is_empty() {
+            return Err(anyhow!("redis.host 不能为空"));
+        }
+        if self.port == 0 {
+            return Err(anyhow!("redis.port 不能为 0"));
+        }
+        Ok(())
+    }
+}
+
+impl TlsConfig {
+    pub fn validate(&self) -> Result<()> {
+        if self.cert.trim().is_empty() || self.key.trim().is_empty() {
+            return Err(anyhow!("tls.cert/tls.key 不能为空"));
+        }
+        if !Path::new(&self.cert).exists() {
+            return Err(anyhow!("tls.cert 文件不存在: {}", self.cert));
+        }
+        if !Path::new(&self.key).exists() {
+            return Err(anyhow!("tls.key 文件不存在: {}", self.key));
+        }
+        Ok(())
+    }
 }

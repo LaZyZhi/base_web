@@ -1,17 +1,21 @@
-//! Redis处理器示例
-//!
-//! 展示如何在处理器中使用Redis服务
+use std::sync::Arc;
 
+use salvo::oapi::ToSchema;
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
-use salvo::oapi::ToSchema;
+use validator::Validate;
 
-use crate::common::api_response::{JsonResult, api_success};
+use crate::app::AppState;
+use crate::common::api_response::{api_success, JsonResult};
 use crate::services::redis_service::RedisService;
+use crate::utils::param_validation_util::validate_param;
+use crate::AppError;
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Validate)]
 pub struct SetRequest {
+    #[validate(length(min = 1, message = "key 不能为空"))]
     pub key: String,
+    #[validate(length(min = 1, message = "value 不能为空"))]
     pub value: String,
     pub ttl: Option<usize>,
 }
@@ -28,21 +32,21 @@ pub struct OperationResponse {
     pub message: String,
 }
 
-/// 设置Redis键值对
+/// 设置Redis键值对（带校验与状态注入）。
 #[endpoint(tags("Redis操作"), summary = "设置键值对", description = "设置Redis键值对，可选过期时间")]
-pub async fn set(req: &mut Request, _res: &mut Response) -> JsonResult<OperationResponse> {
+pub async fn set(req: &mut Request, depot: &mut Depot) -> JsonResult<OperationResponse> {
     let data: SetRequest = req.parse_json().await?;
-    
-    match RedisService::set(&data.key, &data.value, data.ttl) {
-        Ok(_) => {
-            api_success(
-                OperationResponse {
-                    success: true,
-                    message: "设置成功".to_string(),
-                },
-                "设置成功",
-            )
-        }
+    validate_param(&data).await?;
+    let state = get_state(depot)?;
+
+    match RedisService::set_with_pool(&state.redis, &data.key, &data.value, data.ttl).await {
+        Ok(_) => api_success(
+            OperationResponse {
+                success: true,
+                message: "设置成功".to_string(),
+            },
+            "设置成功",
+        ),
         Err(e) => {
             tracing::error!("设置Redis键值对失败: {}", e);
             Err(salvo::http::StatusError::internal_server_error()
@@ -52,21 +56,20 @@ pub async fn set(req: &mut Request, _res: &mut Response) -> JsonResult<Operation
     }
 }
 
-/// 获取Redis键值
+/// 获取Redis键值（依赖 AppState 中的连接池）。
 #[endpoint(tags("Redis操作"), summary = "获取键值", description = "根据键获取Redis中存储的值")]
-pub async fn get(req: &mut Request, _res: &mut Response) -> JsonResult<GetResponse> {
+pub async fn get(req: &mut Request, depot: &mut Depot) -> JsonResult<GetResponse> {
     let key = req.param::<String>("key").unwrap_or_default();
-    
-    match RedisService::get(&key) {
-        Ok(value) => {
-            api_success(
-                GetResponse {
-                    key: key.clone(),
-                    value,
-                },
-                "获取成功",
-            )
-        }
+    let state = get_state(depot)?;
+
+    match RedisService::get_with_pool(&state.redis, &key).await {
+        Ok(value) => api_success(
+            GetResponse {
+                key: key.clone(),
+                value,
+            },
+            "获取成功",
+        ),
         Err(e) => {
             tracing::error!("获取Redis键值失败: {}", e);
             Err(salvo::http::StatusError::internal_server_error()
@@ -76,21 +79,20 @@ pub async fn get(req: &mut Request, _res: &mut Response) -> JsonResult<GetRespon
     }
 }
 
-/// 删除Redis键
+/// 删除Redis键（依赖 AppState 中的连接池）。
 #[endpoint(tags("Redis操作"), summary = "删除键", description = "根据键删除Redis中的值")]
-pub async fn delete(req: &mut Request, _res: &mut Response) -> JsonResult<OperationResponse> {
+pub async fn delete(req: &mut Request, depot: &mut Depot) -> JsonResult<OperationResponse> {
     let key = req.param::<String>("key").unwrap_or_default();
-    
-    match RedisService::del(&key) {
-        Ok(count) => {
-            api_success(
-                OperationResponse {
-                    success: true,
-                    message: format!("删除成功，影响{}个键", count),
-                },
-                "删除成功",
-            )
-        }
+    let state = get_state(depot)?;
+
+    match RedisService::del_with_pool(&state.redis, &key).await {
+        Ok(count) => api_success(
+            OperationResponse {
+                success: true,
+                message: format!("删除成功，影响{}个键", count),
+            },
+            "删除成功",
+        ),
         Err(e) => {
             tracing::error!("删除Redis键失败: {}", e);
             Err(salvo::http::StatusError::internal_server_error()
@@ -98,4 +100,12 @@ pub async fn delete(req: &mut Request, _res: &mut Response) -> JsonResult<Operat
                 .into())
         }
     }
+}
+
+fn get_state(depot: &mut Depot) -> Result<Arc<AppState>, AppError> {
+    depot
+        .get::<Arc<AppState>>("app_state")
+        .ok()
+        .cloned()
+        .ok_or_else(|| AppError::internal("AppState 未注入"))
 }

@@ -63,12 +63,7 @@ impl UserService {
         Ok(())
     }
 
-    pub async fn create_user(data: CreateReq, db: &DatabaseConnection) -> AppResult<()> {
-        // 检查用户是否已存在
-        if let Some(_) = user_repository::query_user_by_user_id(&data.user_id, db).await? {
-            return Err(StatusError::internal_server_error().brief("用户已存在").into());
-        }
-
+    pub async fn create_user(mut data: CreateReq, db: &DatabaseConnection) -> AppResult<sys_user::Model> {
         // 查询输入的工号是否存在
         let employee = employee_repository::query_employee_by_emp_no(&data.user_id, db).await?
             .ok_or_else(|| StatusError::internal_server_error().brief("请使用正确的工号进行注册"))?;
@@ -79,22 +74,17 @@ impl UserService {
         }
 
         // 设置用户名和手机号
-        let mut data = data;
         data.user_name = employee.empname.unwrap_or_default();
         if data.phone.is_none() {
             data.phone = employee.mobileno;
         }
-
         // 密码哈希处理
         data.password = utils::hash_password(&data.password)?;
 
-        // 创建用户
-        user_repository::create_user(data, db).await
-            .map_err(|e| {
-                tracing::error!("create_user error: {}", e);
-                StatusError::internal_server_error().brief("创建用户失败")
-            })?;
-
-        Ok(())
+        // 创建用户，依赖数据库层面的唯一性约束来处理重复用户的情况
+        user_repository::create_user(data, db).await.map_err(|e| {
+            tracing::error!("create_user error: {}", e);
+            e
+        })
     }
 }

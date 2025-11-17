@@ -1,3 +1,4 @@
+use salvo::http::StatusError;
 use sea_orm::{ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 use crate::{
@@ -20,7 +21,7 @@ pub async fn query_user_by_user_id(
         })
 }
 
-pub async fn create_user(data: CreateReq, db: &DatabaseConnection) -> AppResult<()> {
+pub async fn create_user(data: CreateReq, db: &DatabaseConnection) -> AppResult<sys_user::Model> {
     let insert_data = sys_user::ActiveModel {
         user_id: Set(data.user_id),
         user_name: Set(data.user_name),
@@ -32,12 +33,21 @@ pub async fn create_user(data: CreateReq, db: &DatabaseConnection) -> AppResult<
         ..Default::default()
     };
 
-    SysUser::insert(insert_data)
-        .exec(db)
+    let res = SysUser::insert(insert_data)
+        .exec_with_returning(db)
         .await
-        .map(|_| ())
         .map_err(|e| {
+            let error_msg = e.to_string();
+            if error_msg.contains("duplicate key value violates unique constraint") {
+                tracing::error!("create_user error: {}", e);
+                return StatusError::internal_server_error()
+                    .brief("用户已存在")
+                    .into();
+            }
+
             tracing::error!("create_user error: {}", e);
             error_util::system_error()
-        })
+        })?;
+
+    Ok(res)
 }

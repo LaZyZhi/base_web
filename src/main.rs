@@ -1,10 +1,11 @@
-use salvo::catcher::Catcher;
+use anyhow::Result;
 use salvo::conn::rustls::{Keycert, RustlsConfig};
 use salvo::prelude::*;
 use salvo::server::ServerHandle;
 use tokio::signal;
 use tracing::info;
 
+mod app;
 mod cache;
 mod config;
 mod db;
@@ -20,22 +21,16 @@ pub use common::error::AppError;
 mod common;
 
 #[tokio::main]
-async fn main() {
-    crate::config::init();
-    let config = crate::config::get();
-    crate::db::postgres::init(&config.db).await;
-    
-    // 初始化Redis连接池
-    if let Err(e) = crate::cache::redis_manager::init_redis_pool() {
-        tracing::error!("Failed to initialize Redis pool: {}", e);
-    }
+async fn main() -> Result<()> {
+    let state = app::AppState::bootstrap().await?;
+    let state = app::set_app_state(state);
+    let service = app::build_service(state.clone());
+    start_server(state.config, service).await;
+    Ok(())
+}
 
-    let _guard = config.log.guard();
-    tracing::info!("log level: {}", &config.log.filter_level);
-
-    let service = Service::new(routers::root())
-        .catcher(Catcher::default().hoop(hoops::error_404))
-        .hoop(hoops::cors_hoop());
+async fn start_server(config: &'static config::ServerConfig, service: Service) {
+    tracing::info!("Starting server at {}", &config.listen_addr);
     println!("🔄 listen on {}", &config.listen_addr);
     //Acme support, automatically get TLS certificate from Let's Encrypt. For example, see https://github.com/salvo-rs/salvo/blob/main/examples/acme-http01-quinn/src/main.rs
     if let Some(tls) = &config.tls {
@@ -44,8 +39,9 @@ async fn main() {
             "📖 Open API Page: https://{}/scalar",
             listen_addr.replace("0.0.0.0", "127.0.0.1")
         );
-        let config = RustlsConfig::new(Keycert::new().cert(tls.cert.clone()).key(tls.key.clone()));
-        let acceptor = TcpListener::new(listen_addr).rustls(config).bind().await;
+        let tls_config =
+            RustlsConfig::new(Keycert::new().cert(tls.cert.clone()).key(tls.key.clone()));
+        let acceptor = TcpListener::new(listen_addr).rustls(tls_config).bind().await;
         let server = Server::new(acceptor);
         tokio::spawn(shutdown_signal(server.handle()));
         server.serve(service).await;

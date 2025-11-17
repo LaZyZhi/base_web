@@ -1,4 +1,4 @@
-listen_addr = "127.0.0.1:8008"
+listen_addr = "127.0.0.1:8010"
 
 [db]
 # url = "postgres://postgres:Postgres123!@10.22.2.71:5432/streamax?timezone=Asia/Shanghai"

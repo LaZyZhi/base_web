@@ -1,19 +1,29 @@
+use std::sync::Arc;
+
+use salvo::Writer;
 use salvo::{
-    Response,
-    oapi::{endpoint, extract::JsonBody},
+    Depot, Response,
+    oapi::{ToSchema, endpoint, extract::JsonBody},
 };
 
-use crate::common::api_response::json_ok;
+use crate::app::AppState;
+use crate::common::api_response::{JsonResult, json_ok};
+use crate::utils::param_validation_util;
 use crate::{
-    common::api_response::{JsonResult, api_success},
     db,
     hoops::jwt,
     models::permission::user_dto::{CreateReq, LogInRes, LoginReq},
     services::permission::user_service,
-    utils::param_validation_util,
+    services::redis_service::RedisService,
 };
-use salvo::Writer;
-use crate::services::redis_service::RedisService;
+use serde::Serialize;
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CreateResponse {
+    pub user_id: String,
+    pub user_name: String,
+    pub phone: Option<String>,
+}
 
 #[endpoint(
     tags("用户与权限相关"),
@@ -43,9 +53,9 @@ pub async fn login(data: JsonBody<LoginReq>, res: &mut Response) -> JsonResult<L
 
     let (token, exp) = jwt::get_token(&data.user_id)?;
     let token = format!("Bearer {}", token);
-    // 保存进redis
-    let _ = RedisService::set(&token, &data.user_id, Some(exp as usize));
-    
+
+    let _ = RedisService::set_login(&token, &data.user_id, Some(exp as usize)).await;
+
     let _ = res.add_header("Authorization", &token, true);
 
     json_ok(LogInRes {
@@ -54,11 +64,19 @@ pub async fn login(data: JsonBody<LoginReq>, res: &mut Response) -> JsonResult<L
 }
 
 #[endpoint(tags("用户与权限相关"), summary = "用户注册", description = "用户注册")]
-pub async fn create(data: JsonBody<CreateReq>) -> JsonResult<&'static str> {
+pub async fn create(data: JsonBody<CreateReq>) -> JsonResult<CreateResponse> {
     let data = data.into_inner();
     param_validation_util::validate_param(&data).await?;
     let db = db::postgres::pool();
 
-    user_service::UserService::create_user(data, db).await?;
-    json_ok("注册成功")
+    tracing::info!(user_id = %data.user_id, "user register start");
+    
+    let created = user_service::UserService::create_user(data, db).await?;
+    tracing::info!(user_id = %created.user_id, "user register success");
+
+    json_ok(CreateResponse {
+        user_id: created.user_id,
+        user_name: created.user_name,
+        phone: created.phone,
+    })
 }
